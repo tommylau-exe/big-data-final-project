@@ -1,36 +1,53 @@
 #!/usr/bin/env python3
 
-import os
-import csv
-import json
-from dotenv import load_dotenv
-from pathlib import Path
+import os, sys
+import csv, json
+import urllib.request
 
-# Load API Key from .env in project root dir
-env_path = Path('..') / '.env'
-load_dotenv(dotenv_path=env_path)
+currentPath = os.path.dirname(os.path.realpath(__file__))
+baseImgUrl = 'https://image.tmdb.org/t/p/w500'
+moviesMetadataPath = os.path.join(currentPath, '../data/the-movies-dataset/movies_metadata.csv')
 
-tmdb_api_key = os.getenv('TMDB_API_KEY')
-if tmdb_api_key is None:
-    print('No TMDB API Key found. Please set the TMDB_API_KEY environmental variable and try again.')
-
-base_img_url = 'https://image.tmdb.org/t/p/w500'
-movies_metadata_path = '../data/the-movies-dataset/movies_metadata.csv'
-
-with open(movies_metadata_path, 'r') as movies_metadata:
-    reader = csv.reader(movies_metadata)
+with open(moviesMetadataPath, 'r') as moviesMetadata:
+    reader = csv.reader(moviesMetadata)
     next(reader) # trash header
     
-    count = 1
+    imgCount = 0
+    errCount = 0
+    totalCount = 0
     for row in reader:
-        collection_str = row[1]
-        if collection_str:
-            collection_str = collection_str.replace('\'', '"')
-            try:
-                collection = json.loads(collection_str)
-                print(collection["poster_path"])
-            except json.JSONDecodeError:
-                print('decoding error')
+        collectionStr = row[1]
+        if collectionStr:
+            collectionStr = collectionStr.replace('\'', '"') # make into valid JSON
+            posterPath = None
 
-        count += 1
-        print(count)
+            try:
+                collection = json.loads(collectionStr)
+                posterPath = collection['poster_path']
+                imgCount += 1
+            except json.JSONDecodeError:
+                errCount += 1
+            except:
+                pass
+
+            if posterPath is not None: # if no errors
+                posterUrl = baseImgUrl + posterPath
+                resp = urllib.request.urlopen(posterUrl)
+
+                if resp.code != 200:
+                    print(f'img {imgCount}: response code {resp.code}')
+                else:
+                    posterFilePath = os.path.join(currentPath, '../data/img/', posterPath[1:])
+                    print(f'img {imgCount}: saving to', posterFilePath)
+
+                    if not os.path.exists(posterFilePath):
+                        with open(posterFilePath, 'w'): # create file if it doesn't exist
+                            pass
+
+                    urllib.request.urlretrieve(posterUrl, posterFilePath)
+
+        totalCount += 1
+
+    imgPct = (imgCount / totalCount) * 100
+    errPct = (errCount / totalCount) * 100
+    print(f'Found {imgCount} images ({imgPct:.2f}%) out of {totalCount} data points with {errCount} parse errors ({errPct:.2f}%)')
