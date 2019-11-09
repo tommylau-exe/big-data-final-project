@@ -1,2 +1,6 @@
+/data/*/*
+!/data/the-movies-dataset/src.txt
+
+# Scala
 *.class
 *.log
