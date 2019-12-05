@@ -1,4 +1,3 @@
-.env
 /data/*/*
 !/data/the-movies-dataset/src.txt
 
