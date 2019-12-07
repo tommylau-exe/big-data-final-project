@@ -1,1 +1,1 @@
-["sbt.Task[scala.collection.Seq[scala.Tuple2[java.nio.file.Path, sbt.nio.FileStamp]]]",{"hashes":[],"lastModifiedTimes":[]}]
+["sbt.Task[scala.collection.Seq[scala.Tuple2[java.nio.file.Path, sbt.nio.FileStamp]]]",{"hashes":[["/Users/tempix/Coding/Class/BigData/final-project/build.sbt","cdd35e427c1d10342f1cf33f339b0ed2be7bfd74"]],"lastModifiedTimes":[]}]
