@@ -1,0 +1,1 @@
+scalac -bootclasspath /Users/tempix/.sbt/boot/scala-2.12.10/lib/scala-library.jar -classpath /Users/tempix/Coding/Class/BigData/final-project/target/scala-2.12/classes /Users/tempix/Coding/Class/BigData/final-project/src/main/scala/Main.scala

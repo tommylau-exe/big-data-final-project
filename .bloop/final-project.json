@@ -1,0 +1,142 @@
+{
+    "version" : "1.1.2",
+    "project" : {
+        "name" : "final-project",
+        "directory" : "/Users/tempix/Coding/Class/BigData/final-project",
+        "sources" : [
+            "/Users/tempix/Coding/Class/BigData/final-project/src/main/scala-2.12",
+            "/Users/tempix/Coding/Class/BigData/final-project/src/main/scala",
+            "/Users/tempix/Coding/Class/BigData/final-project/src/main/java",
+            "/Users/tempix/Coding/Class/BigData/final-project/target/scala-2.12/src_managed/main"
+        ],
+        "dependencies" : [
+        ],
+        "classpath" : [
+            "/Users/tempix/.sbt/boot/scala-2.12.10/lib/scala-library.jar"
+        ],
+        "out" : "/Users/tempix/Coding/Class/BigData/final-project/.bloop/final-project",
+        "classesDir" : "/Users/tempix/Coding/Class/BigData/final-project/.bloop/final-project/scala-2.12/classes",
+        "resources" : [
+            "/Users/tempix/Coding/Class/BigData/final-project/src/main/resources",
+            "/Users/tempix/Coding/Class/BigData/final-project/target/scala-2.12/resource_managed/main"
+        ],
+        "scala" : {
+            "organization" : "org.scala-lang",
+            "name" : "scala-compiler",
+            "version" : "2.12.10",
+            "options" : [
+                "-P:semanticdb:synthetics:on",
+                "-P:semanticdb:failures:warning",
+                "-P:semanticdb:sourceroot:/Users/tempix/Coding/Class/BigData/final-project",
+                "-Yrangepos",
+                "-Xplugin-require:semanticdb",
+                "-Xplugin:/Users/tempix/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scalameta/semanticdb-scalac_2.12.10/4.2.3/semanticdb-scalac_2.12.10-4.2.3.jar"
+            ],
+            "jars" : [
+                "/Users/tempix/.sbt/boot/scala-2.12.10/lib/scala-library.jar",
+                "/Users/tempix/.sbt/boot/scala-2.12.10/lib/scala-compiler.jar",
+                "/Users/tempix/.sbt/boot/scala-2.12.10/lib/jline.jar",
+                "/Users/tempix/.sbt/boot/scala-2.12.10/lib/scala-reflect.jar",
+                "/Users/tempix/.sbt/boot/scala-2.12.10/lib/jansi.jar",
+                "/Users/tempix/.sbt/boot/scala-2.12.10/lib/scala-xml_2.12.jar"
+            ],
+            "setup" : {
+                "order" : "mixed",
+                "addLibraryToBootClasspath" : true,
+                "addCompilerToClasspath" : false,
+                "addExtraJarsToClasspath" : false,
+                "manageBootClasspath" : true,
+                "filterLibraryFromClasspath" : true
+            }
+        },
+        "java" : {
+            "options" : [
+            ]
+        },
+        "test" : {
+            "frameworks" : [
+                {
+                    "names" : [
+                        "org.scalacheck.ScalaCheckFramework"
+                    ]
+                },
+                {
+                    "names" : [
+                        "org.specs2.runner.Specs2Framework",
+                        "org.specs2.runner.SpecsFramework"
+                    ]
+                },
+                {
+                    "names" : [
+                        "org.specs.runner.SpecsFramework"
+                    ]
+                },
+                {
+                    "names" : [
+                        "org.scalatest.tools.Framework",
+                        "org.scalatest.tools.ScalaTestFramework"
+                    ]
+                },
+                {
+                    "names" : [
+                        "com.novocode.junit.JUnitFramework"
+                    ]
+                }
+            ],
+            "options" : {
+                "excludes" : [
+                ],
+                "arguments" : [
+                ]
+            }
+        },
+        "platform" : {
+            "name" : "jvm",
+            "config" : {
+                "home" : "/Library/Java/JavaVirtualMachines/jdk1.8.0_111.jdk/Contents/Home/jre",
+                "options" : [
+                ]
+            },
+            "mainClass" : [
+            ]
+        },
+        "resolution" : {
+            "modules" : [
+                {
+                    "organization" : "org.scala-lang",
+                    "name" : "scala-library",
+                    "version" : "2.12.10",
+                    "configurations" : "default",
+                    "artifacts" : [
+                        {
+                            "name" : "scala-library",
+                            "path" : "/Users/tempix/.sbt/boot/scala-2.12.10/lib/scala-library.jar"
+                        },
+                        {
+                            "name" : "scala-library",
+                            "classifier" : "sources",
+                            "path" : "/Users/tempix/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.12.10/scala-library-2.12.10-sources.jar"
+                        }
+                    ]
+                },
+                {
+                    "organization" : "org.scala-lang",
+                    "name" : "scala-library",
+                    "version" : "2.12.10",
+                    "configurations" : "optional",
+                    "artifacts" : [
+                        {
+                            "name" : "scala-library",
+                            "path" : "/Users/tempix/.sbt/boot/scala-2.12.10/lib/scala-library.jar"
+                        },
+                        {
+                            "name" : "scala-library",
+                            "classifier" : "sources",
+                            "path" : "/Users/tempix/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.12.10/scala-library-2.12.10-sources.jar"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}
