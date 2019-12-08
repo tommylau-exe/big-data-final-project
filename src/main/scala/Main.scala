@@ -1,10 +1,14 @@
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
-import org.apache.spark.ml.feature.{ StringIndexer, VectorAssembler, IndexToString }
+import org.apache.spark.ml.feature.{ StringIndexer, VectorAssembler, IndexToString, OneHotEncoderEstimator }
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.classification.{ RandomForestClassificationModel, RandomForestClassifier }
 import org.apache.spark.ml.regression.{ RandomForestRegressor }
-import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
+import org.apache.spark.ml.evaluation.{ MulticlassClassificationEvaluator, RegressionEvaluator }
+
+import swiftvis2.plotting.Plot
+import swiftvis2.plotting._
+import swiftvis2.plotting.renderer.SwingRenderer
 
 object Main {
   def main(args: Array[String]): Unit = {
@@ -54,14 +58,31 @@ object Main {
         .count()
         .sort(-$"count")
         .select("genre")
+        .as[String]
         .take(3)
 
       println(s"Most frequent genres: ${mostFrequentGenres.mkString(", ")}")
 
+      val allColors = List(RedARGB, YellowARGB, GreenARGB, CyanARGB, BlueARGB, MagentaARGB, RedARGB)
+      val rainbowCg = ColorGradient(allColors.zipWithIndex.map { case (c,i) => i.toDouble / (allColors.length - 1) -> c }:_*)
       mostFrequentGenres.foreach(genre => {
-        joinedData
+        val data = joinedData
           .filter($"genre" === genre)
+          .select("avg_h", "avg_s", "avg_v")
+          .as[(Double, Double, Double)]
           .collect()
+
+          val plot = Plot.scatterPlot(
+            data.map(_._1),
+            data.map(_._3),
+            s"HSV Distribution in $genre Movie Posters",
+            "Average Hue",
+            "Average Value",
+            symbolSize = data.map(data => data._2 * 5 + 2),
+            symbolColor = data.map(data => rainbowCg(data._1))
+          )
+
+          SwingRenderer(plot, 800, 600, true)
       })
     }
 
@@ -72,53 +93,49 @@ object Main {
         .setOutputCol("genreIndex")
         .fit(joinedData)
 
+      val indexedData = indexer.transform(joinedData)
+      
+      val ohe = new OneHotEncoderEstimator()
+        .setInputCols(Array("genreIndex"))
+        .setOutputCols(Array("genreOhe"))
+        .fit(indexedData)
+
       val va = new VectorAssembler()
         .setInputCols(Array("avg_h", "avg_s", "avg_v"))
         .setOutputCol("features")
 
-      val rf = new RandomForestClassifier()
+      val rf = new RandomForestRegressor()
         .setLabelCol("genreIndex")
         .setFeaturesCol("features")
         .setNumTrees(10)
 
-      val unIndexer = new IndexToString()
-        .setLabels(indexer.labels)
-        .setInputCol("prediction")
-        .setOutputCol("predictionLabel")
-
       val pipeline = new Pipeline()
-        .setStages(Array(indexer, va, rf, unIndexer))
+        .setStages(Array(ohe, va, rf))
 
       // Split data and apply
-      val Array(trainingData, testData) = joinedData.randomSplit(Array(0.75, 0.25))
+      val Array(trainingData, testData) = indexedData.randomSplit(Array(0.75, 0.25))
 
       val model = pipeline.fit(trainingData)
 
       val predictions = model.transform(testData)
 
       // Show some predictions
-      predictions.select("features", "genre", "predictionLabel").show()
+      predictions.select("features", "genre", "genreIndex", "prediction").show()
 
       // Evaluate predictions
-      val evaluator = new MulticlassClassificationEvaluator()
+      val evaluator = new RegressionEvaluator()
         .setLabelCol("genreIndex")
         .setPredictionCol("prediction")
-        .setMetricName("accuracy")
+        .setMetricName("rmse")
 
-      val accuracy = evaluator.evaluate(predictions)
-      println(s"Classifier accuracy: ${accuracy}")
-
-      // Calculate percent each genre is predicted
-      val numPredictions = predictions.count
-      predictions
-        .groupBy("predictionLabel")
-        .count()
-        .withColumn("pctPredicted", ($"count" / numPredictions.toDouble) * 100)
-        .show(false)
+      val rmse = evaluator.evaluate(predictions)
+      println(s"Classifier rmse: $rmse")
 
       // val rfModel = model.stages(2).asInstanceOf[RandomForestClassificationModel]
       // println(s"Learned classification forest model:\n ${rfModel.toDebugString}")
     }
+
+    println(hsvGraphs)
 
     spark.stop()
   }
