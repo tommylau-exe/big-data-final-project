@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import multiprocessing as mp
-import os, sys
+import os
 import csv, json
 import urllib.request
 from tqdm import tqdm
