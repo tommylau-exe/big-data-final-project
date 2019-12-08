@@ -30,9 +30,10 @@ def calcStats(posterPath):
 
     try:
         img = Image.open(posterPath).getdata() # rgb pixels in image
+        img = [tuple([c/255 for c in color]) for color in img]
         avgRgb = avgTups(img)
-        img = [colorsys.rgb_to_hsv(*rgb) for rgb in img]
-        avgHsv = avgTups(img)
+        # img = [colorsys.rgb_to_hsv(*rgb) for rgb in img]
+        avgHsv = colorsys.rgb_to_hsv(*avgRgb)
 
         return (imgId,) + avgRgb + avgHsv
     except: # not entirely sure why this happens
