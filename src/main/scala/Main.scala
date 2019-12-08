@@ -2,7 +2,8 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.spark.ml.feature.{ StringIndexer, VectorAssembler, IndexToString }
 import org.apache.spark.ml.Pipeline
-import org.apache.spark.ml.classification.{RandomForestClassificationModel, RandomForestClassifier}
+import org.apache.spark.ml.classification.{ RandomForestClassificationModel, RandomForestClassifier }
+import org.apache.spark.ml.regression.{ RandomForestRegressor }
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 
 object Main {
@@ -39,53 +40,85 @@ object Main {
       .join(posterStats, "img_id")
       .join(moviesGenre, "id")
 
+    // Some quick statistics
     val numGenres = joinedData.select("genre").distinct().count
     println(s"Total number of genres: $numGenres")
 
-    // Set up pipeline
-    val indexer = new StringIndexer()
-      .setInputCol("genre")
-      .setOutputCol("genreIndex")
-      .fit(joinedData)
+    val numMovies = moviesMetadata.count
+    val numDrama  = moviesGenre.filter($"genre" === "Drama").count
+    println(s"Percentage of movies that are Drama: ${(numDrama.toDouble / numMovies) * 100}")
 
-    val va = new VectorAssembler()
-      .setInputCols(Array("avg_h", "avg_s", "avg_v"))
-      .setOutputCol("features")
+    lazy val hsvGraphs = {
+      val mostFrequentGenres = moviesGenre
+        .groupBy("genre")
+        .count()
+        .sort(-$"count")
+        .select("genre")
+        .take(3)
 
-    val rf = new RandomForestClassifier()
-      .setLabelCol("genreIndex")
-      .setFeaturesCol("features")
-      .setNumTrees(10)
+      println(s"Most frequent genres: ${mostFrequentGenres.mkString(", ")}")
 
-    val unIndexer = new IndexToString()
-      .setLabels(indexer.labels)
-      .setInputCol("prediction")
-      .setOutputCol("predictionLabel")
+      mostFrequentGenres.foreach(genre => {
+        joinedData
+          .filter($"genre" === genre)
+          .collect()
+      })
+    }
 
-    val pipeline = new Pipeline()
-      .setStages(Array(indexer, va, rf, unIndexer))
+    lazy val genrePrediction = {
+      // Set up pipeline
+      val indexer = new StringIndexer()
+        .setInputCol("genre")
+        .setOutputCol("genreIndex")
+        .fit(joinedData)
 
-    // Split data and apply
-    val Array(trainingData, testData) = joinedData.randomSplit(Array(0.75, 0.25))
+      val va = new VectorAssembler()
+        .setInputCols(Array("avg_h", "avg_s", "avg_v"))
+        .setOutputCol("features")
 
-    val model = pipeline.fit(trainingData)
+      val rf = new RandomForestClassifier()
+        .setLabelCol("genreIndex")
+        .setFeaturesCol("features")
+        .setNumTrees(10)
 
-    val predictions = model.transform(testData)
+      val unIndexer = new IndexToString()
+        .setLabels(indexer.labels)
+        .setInputCol("prediction")
+        .setOutputCol("predictionLabel")
 
-    // Show some predictions
-    predictions.select("features", "genre", "predictionLabel").show()
+      val pipeline = new Pipeline()
+        .setStages(Array(indexer, va, rf, unIndexer))
 
-    // Evaluate predictions
-    val evaluator = new MulticlassClassificationEvaluator()
-      .setLabelCol("genreIndex")
-      .setPredictionCol("prediction")
-      .setMetricName("accuracy")
+      // Split data and apply
+      val Array(trainingData, testData) = joinedData.randomSplit(Array(0.75, 0.25))
 
-    val accuracy = evaluator.evaluate(predictions)
-    println(s"Classifier accuracy: ${accuracy}")
+      val model = pipeline.fit(trainingData)
 
-    // val rfModel = model.stages(2).asInstanceOf[RandomForestClassificationModel]
-    // println(s"Learned classification forest model:\n ${rfModel.toDebugString}")
+      val predictions = model.transform(testData)
+
+      // Show some predictions
+      predictions.select("features", "genre", "predictionLabel").show()
+
+      // Evaluate predictions
+      val evaluator = new MulticlassClassificationEvaluator()
+        .setLabelCol("genreIndex")
+        .setPredictionCol("prediction")
+        .setMetricName("accuracy")
+
+      val accuracy = evaluator.evaluate(predictions)
+      println(s"Classifier accuracy: ${accuracy}")
+
+      // Calculate percent each genre is predicted
+      val numPredictions = predictions.count
+      predictions
+        .groupBy("predictionLabel")
+        .count()
+        .withColumn("pctPredicted", ($"count" / numPredictions.toDouble) * 100)
+        .show(false)
+
+      // val rfModel = model.stages(2).asInstanceOf[RandomForestClassificationModel]
+      // println(s"Learned classification forest model:\n ${rfModel.toDebugString}")
+    }
 
     spark.stop()
   }
