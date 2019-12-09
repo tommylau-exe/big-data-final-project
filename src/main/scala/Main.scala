@@ -39,10 +39,13 @@ object Main {
       .csv("data/etc/movies_genre.csv")
 
     // Join all datasets
+    val getYear = udf { (s: String) => s.take(4).toInt }
+
     lazy val joinedData = moviesMetadata
       .join(posterMovieLink, "title")
       .join(posterStats, "img_id")
       .join(moviesGenre, "id")
+      .withColumn("year", getYear($"release_date"))
 
     // Some quick statistics
     val numGenres = joinedData.select("genre").distinct().count
@@ -74,8 +77,6 @@ object Main {
     }
 
     lazy val hueOverTime = {
-      val getYear = udf { (s: String) => s.take(4).toInt }
-
       val data = joinedData
         .filter($"release_date".isNotNull)
         .withColumn("year", getYear($"release_date"))
@@ -97,55 +98,85 @@ object Main {
     }
 
     lazy val genrePrediction = {
+      val usingGenres = moviesGenre
+        .groupBy("genre")
+        .count()
+        .sort(-$"count")
+        .select("genre")
+        .as[String]
+        .take(5)
+
+      println(s"Using genres ${usingGenres.mkString(", ")}")
+
+      val genreRank = udf { (s: String) => usingGenres.indexOf(s) }
+      val genreFromRank = udf { (r: Int) => usingGenres(r) }
+
+      val trimmedData = moviesGenre
+        .join(spark.createDataset(usingGenres.toSeq).toDF("genre"), "genre")
+        .withColumn("genreRank", genreRank($"genre"))
+        .groupBy("id")
+        .max("genreRank") // To break ties using most common genre, change .max() to .min()
+        .withColumnRenamed("max(genreRank)", "genreRank")
+        .withColumn("genre", genreFromRank($"genreRank"))
+        .join(joinedData, Seq("id", "genre"))
+
+      trimmedData.show
+
       // Set up pipeline
       val indexer = new StringIndexer()
         .setInputCol("genre")
         .setOutputCol("genreIndex")
-        .fit(joinedData)
-
-      val indexedData = indexer.transform(joinedData)
-      
-      val ohe = new OneHotEncoderEstimator()
-        .setInputCols(Array("genreIndex"))
-        .setOutputCols(Array("genreOhe"))
-        .fit(indexedData)
+        .fit(trimmedData)
 
       val va = new VectorAssembler()
-        .setInputCols(Array("avg_h", "avg_s", "avg_v"))
+        .setInputCols(Array("avg_h", "avg_s", "avg_v", "year", "budget"))
         .setOutputCol("features")
 
-      val rf = new RandomForestRegressor()
+      val rf = new RandomForestClassifier()
         .setLabelCol("genreIndex")
         .setFeaturesCol("features")
         .setNumTrees(10)
 
+      val unIndexer = new IndexToString()
+        .setLabels(indexer.labels)
+        .setInputCol("prediction")
+        .setOutputCol("predictionLabel")
+
       val pipeline = new Pipeline()
-        .setStages(Array(ohe, va, rf))
+        .setStages(Array(indexer, va, rf, unIndexer))
 
       // Split data and apply
-      val Array(trainingData, testData) = indexedData.randomSplit(Array(0.75, 0.25))
+      val Array(trainingData, testData) = trimmedData.randomSplit(Array(0.75, 0.25))
 
       val model = pipeline.fit(trainingData)
 
       val predictions = model.transform(testData)
 
       // Show some predictions
-      predictions.select("features", "genre", "genreIndex", "prediction").show()
+      predictions.select("features", "genre", "predictionLabel").show()
 
       // Evaluate predictions
-      val evaluator = new RegressionEvaluator()
+      val evaluator = new MulticlassClassificationEvaluator()
         .setLabelCol("genreIndex")
         .setPredictionCol("prediction")
-        .setMetricName("rmse")
+        .setMetricName("accuracy")
 
-      val rmse = evaluator.evaluate(predictions)
-      println(s"Classifier rmse: $rmse")
+      val accuracy = evaluator.evaluate(predictions)
+      println(s"Classifier accuracy: ${accuracy}")
+
+      // Calculate percent each genre is predicted
+      val numPredictions = predictions.count
+      predictions
+        .groupBy("predictionLabel")
+        .count()
+        .withColumn("pctPredicted", ($"count" / numPredictions.toDouble) * 100)
+        .show(false)
 
       // val rfModel = model.stages(2).asInstanceOf[RandomForestClassificationModel]
       // println(s"Learned classification forest model:\n ${rfModel.toDebugString}")
     }
 
-    println(hueOverTime)
+    println(genrePrediction)
 
     spark.stop()
   }
