@@ -52,38 +52,48 @@ object Main {
     val numDrama  = moviesGenre.filter($"genre" === "Drama").count
     println(s"Percentage of movies that are Drama: ${(numDrama.toDouble / numMovies) * 100}")
 
+    val allColors = List(RedARGB, YellowARGB, GreenARGB, CyanARGB, BlueARGB, MagentaARGB, RedARGB)
+    val rainbowCg = ColorGradient(allColors.zipWithIndex.map { case (c,i) => i.toDouble / (allColors.length - 1) -> c }:_*)
     lazy val hsvGraphs = {
-      val mostFrequentGenres = moviesGenre
-        .groupBy("genre")
-        .count()
-        .sort(-$"count")
-        .select("genre")
-        .as[String]
-        .take(3)
+      val data = joinedData
+        .select("avg_h", "avg_s", "avg_v")
+        .as[(Double, Double, Double)]
+        .collect()
 
-      println(s"Most frequent genres: ${mostFrequentGenres.mkString(", ")}")
+        val plot = Plot.scatterPlot(
+          data.map(_._1),
+          data.map(_._3),
+          s"HSV Distribution in Movie Posters",
+          "Average Hue",
+          "Average Value",
+          symbolSize = data.map(data => data._2 * 5 + 2),
+          symbolColor = data.map(data => rainbowCg(data._1))
+        )
 
-      val allColors = List(RedARGB, YellowARGB, GreenARGB, CyanARGB, BlueARGB, MagentaARGB, RedARGB)
-      val rainbowCg = ColorGradient(allColors.zipWithIndex.map { case (c,i) => i.toDouble / (allColors.length - 1) -> c }:_*)
-      mostFrequentGenres.foreach(genre => {
-        val data = joinedData
-          .filter($"genre" === genre)
-          .select("avg_h", "avg_s", "avg_v")
-          .as[(Double, Double, Double)]
-          .collect()
+        SwingRenderer(plot, 800, 600, true)
+    }
 
-          val plot = Plot.scatterPlot(
-            data.map(_._1),
-            data.map(_._3),
-            s"HSV Distribution in $genre Movie Posters",
-            "Average Hue",
-            "Average Value",
-            symbolSize = data.map(data => data._2 * 5 + 2),
-            symbolColor = data.map(data => rainbowCg(data._1))
-          )
+    lazy val hueOverTime = {
+      val getYear = udf { (s: String) => s.take(4).toInt }
 
-          SwingRenderer(plot, 800, 600, true)
-      })
+      val data = joinedData
+        .filter($"release_date".isNotNull)
+        .withColumn("year", getYear($"release_date"))
+        .select("avg_h", "year")
+        .as[(Double, Int)]
+        .collect()
+
+      val plot = Plot.scatterPlot(
+        data.map(_._2),
+        data.map(_._1),
+        s"Average Hue Distribution in Movie Posters over Time",
+        "Release Year",
+        "Average Poster Hue",
+        symbolSize = 4,
+        symbolColor = data.map(data => rainbowCg(data._1)),
+      )
+
+      SwingRenderer(plot, 800, 800, true)
     }
 
     lazy val genrePrediction = {
@@ -135,7 +145,7 @@ object Main {
       // println(s"Learned classification forest model:\n ${rfModel.toDebugString}")
     }
 
-    println(hsvGraphs)
+    println(hueOverTime)
 
     spark.stop()
   }
