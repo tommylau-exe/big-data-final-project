@@ -115,7 +115,7 @@ object Main {
         .sort(-$"count")
         .select("genre")
         .as[String]
-        .take(3)
+        .take(5)
 
       println(s"Using genres ${usingGenres.mkString(", ")}")
 
@@ -183,6 +183,28 @@ object Main {
 
       // val rfModel = model.stages(2).asInstanceOf[RandomForestClassificationModel]
       // println(s"Learned classification forest model:\n ${rfModel.toDebugString}")
+    }
+
+    lazy val ratingsGraph = {
+      val buckets = (0.0 to 5.5 by 0.5).toArray
+
+      val histData = movieRatings
+        .select("rating")
+        .as[Double]
+        .rdd
+        .histogram(buckets, true)
+
+      val plot = Plot.histogramPlot(
+        buckets,
+        histData,
+        BlackARGB,
+        centerOnBins = false,
+        "Frequency of Movie Ratings",
+        "Rating",
+        "Frequency of Rating"
+      )
+
+      SwingRenderer(plot, 800, 600, true)
     }
 
     lazy val reccomendation = {

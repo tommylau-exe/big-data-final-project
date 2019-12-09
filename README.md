@@ -61,3 +61,72 @@ So with all this (big) data, what kind of questions can I answer? Well, the one 
 How well can I classify the genre of a movie based solely on it's poster?
 
 Let's find out.
+
+# Immediately I ran into issues
+
+The thing about movies is that they typically have multiple genres.
+
+One important aspect of classification is that it assumes there to be one correct answer for every prediction.
+
+So how to I create a model that accounts for multiple correct answers?
+
+# Change the data
+
+Although Dr. Lewis was very helpful providing me a clever potential solution involving regression, multi-hot-encoding and more I decided in the end to keep it simple.
+
+If I could find some way to pick one genre from the many that most movies have, I could simplify the problem greatly. It might also be nice to reduce the total 20 possible genres to a number that's more manageable.
+
+Solution: Pick the 5 most common genres. Keep only the movies that have at least one of those genres. In the event that one movie is classified as more than one of those common genres, keep the least common genre.
+
+# Back to classification!
+
+Now that the problem is in the format of any trivial classification problem, the rest is simple. I decided to go with a Random Forest Classifier with ten trees, the outline of my model is as follows:
+
+- Random Forest Classifier
+  - 10 Trees
+  - Inputs: average hue, average saturation, average value
+  - Ouptut: one of 5 popular movie genres
+    - Drama, Comedy, Thriller, Romance, or Action
+
+# Results
+
+Remember when I said that some healthy skepticism with regards to averaging hue, saturation and value over an entire image was well warranted? Here's why.
+
+The classifier's accuracy came out to about 29.17%.
+
+While pretty abysmal, it's interesting to see that the accuracy got much of anything right at all given the terrible input I'm giving it.
+
+# What went wrong
+
+I only realized this in retrospect, but averaging the HSV values in an image loses a lot of information, and what results is a mostly same-y mess.
+
+I was really trying to avoid over-complicating the problem, but I think that in doing so I dumbed it down so much that it was hardly doable anymore. I never looked into how well this is supported by Spark, but I think it would be interesting to go at my original question using something like a Convolutional Neural Network to pick out non-obvious features of movie posters and hopefully better classify genres.
+
+# Let's move on
+
+Sad, tired, and discouraged I poured over my dataset to try to find something else to analyze.
+When I stumbled upon the ratings section of my dataset I immediately thought of a reccomendation system.
+Before we do that though, let's dig into the dataset a little more.
+
+![Frequency of Movie Ratings](/img/freq_movie_ratings.png)
+
+This graph displays the number of movies rated at 0.5 stars, 1 star, 1.5 stars, 2 stars, and so on to 5 stars.
+It seems that most people rate movies in the middle of the road with a 3 or a 4-star rating. Meanwhile, 0.5 and 1.5 are the least common ratings.
+
+# Question 2
+
+If the goal is to build a reccomendation system then the logical question is as follows:
+
+Can we build an intelligent movie reccomendation system based on the reviews of other users?
+
+Thankfully Spark has a great reccomendation algorithm built-in, so I'll be using the Alternating Least Squares (ALS) algorithm they provide to build my reccomendations. To summarize:
+
+- ALS Model
+  - Max iterations: 5
+  - Regularization Parameter: 0.1
+  - Inputs: (movieId, rating) pairs
+  - Ouptut: Movie reccomendations
+
+# Results
+
+With a root mean squared error of about 0.844 (in a range from 0.0-5.0) I'd say this model was more successful that the genre classifier. It still leaves a lot to be desired in terms of accuracy, but I'm not sure if this is my fault due to some oversight or if this is just a limitation of ALS.
