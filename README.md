@@ -19,6 +19,8 @@ Some specific features of the dataset did stand out to me though:
 - User ratings for each movie
 
 These were the features that I decided to focus on for my questions.
+The dataset originally comes from MovieLens, which is an online movie reccomendation system.
+I found the dataset on [Kaggle](https://www.kaggle.com/rounakbanik/the-movies-dataset).
 
 # Analyzing Movie Posters
 
