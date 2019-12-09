@@ -105,7 +105,7 @@ I was really trying to avoid over-complicating the problem, but I think that in 
 # Let's move on
 
 Sad, tired, and discouraged I poured over my dataset to try to find something else to analyze.
-When I stumbled upon the ratings section of my dataset I immediately thought of a reccomendation system.
+When I stumbled upon the ratings section of my dataset I immediately thought of a recommendation system.
 Before we do that though, let's dig into the dataset a little more.
 
 ![Frequency of Movie Ratings](/img/freq_movie_ratings.png)
@@ -115,17 +115,17 @@ It seems that most people rate movies in the middle of the road with a 3 or a 4-
 
 # Question 2
 
-If the goal is to build a reccomendation system then the logical question is as follows:
+If the goal is to build a recommendation system then the logical question is as follows:
 
-Can we build an intelligent movie reccomendation system based on the reviews of other users?
+Can we build an intelligent movie recommendation system based on the reviews of other users?
 
-Thankfully Spark has a great reccomendation algorithm built-in, so I'll be using the Alternating Least Squares (ALS) algorithm they provide to build my reccomendations. To summarize:
+Thankfully Spark has a great recommendation algorithm built-in, so I'll be using the Alternating Least Squares (ALS) algorithm they provide to build my recommendations. To summarize:
 
 - ALS Model
   - Max iterations: 5
   - Regularization Parameter: 0.1
   - Inputs: (movieId, rating) pairs
-  - Ouptut: Movie reccomendations
+  - Output: Movie recommendations
 
 # Results
 
