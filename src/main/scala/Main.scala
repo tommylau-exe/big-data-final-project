@@ -1,10 +1,12 @@
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types._
 import org.apache.spark.ml.feature.{ StringIndexer, VectorAssembler, IndexToString, OneHotEncoderEstimator }
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.classification.{ RandomForestClassificationModel, RandomForestClassifier }
 import org.apache.spark.ml.regression.{ RandomForestRegressor }
 import org.apache.spark.ml.evaluation.{ MulticlassClassificationEvaluator, RegressionEvaluator }
+import org.apache.spark.ml.recommendation.ALS
 
 import swiftvis2.plotting.Plot
 import swiftvis2.plotting._
@@ -38,6 +40,11 @@ object Main {
       .option("inferSchema", true)
       .csv("data/etc/movies_genre.csv")
 
+    lazy val ratings = spark.read
+      .option("header", true)
+      .option("inferSchema", true)
+      .csv("data/the-movies-dataset/ratings.csv")
+
     // Join all datasets
     val getYear = udf { (s: String) => s.take(4).toInt }
 
@@ -45,15 +52,13 @@ object Main {
       .join(posterMovieLink, "title")
       .join(posterStats, "img_id")
       .join(moviesGenre, "id")
+
+    lazy val yearData = joinedData
+      .filter($"release_date".isNotNull)
       .withColumn("year", getYear($"release_date"))
 
-    // Some quick statistics
-    val numGenres = joinedData.select("genre").distinct().count
-    println(s"Total number of genres: $numGenres")
-
-    val numMovies = moviesMetadata.count
-    val numDrama  = moviesGenre.filter($"genre" === "Drama").count
-    println(s"Percentage of movies that are Drama: ${(numDrama.toDouble / numMovies) * 100}")
+    lazy val movieRatings = moviesMetadata
+      .join(ratings, $"id" === $"movieId")
 
     val allColors = List(RedARGB, YellowARGB, GreenARGB, CyanARGB, BlueARGB, MagentaARGB, RedARGB)
     val rainbowCg = ColorGradient(allColors.zipWithIndex.map { case (c,i) => i.toDouble / (allColors.length - 1) -> c }:_*)
@@ -77,9 +82,7 @@ object Main {
     }
 
     lazy val hueOverTime = {
-      val data = joinedData
-        .filter($"release_date".isNotNull)
-        .withColumn("year", getYear($"release_date"))
+      val data = yearData
         .select("avg_h", "year")
         .as[(Double, Int)]
         .collect()
@@ -98,27 +101,33 @@ object Main {
     }
 
     lazy val genrePrediction = {
+      // Some quick statistics
+      val numGenres = joinedData.select("genre").distinct().count
+      println(s"Total number of genres: $numGenres")
+
+      val numMovies = moviesMetadata.count
+      val numDrama  = moviesGenre.filter($"genre" === "Drama").count
+      println(s"Percentage of movies that are Drama: ${(numDrama.toDouble / numMovies) * 100}")
+
       val usingGenres = moviesGenre
         .groupBy("genre")
         .count()
         .sort(-$"count")
         .select("genre")
         .as[String]
-        .take(5)
+        .take(3)
 
       println(s"Using genres ${usingGenres.mkString(", ")}")
 
-      val genreRank = udf { (s: String) => usingGenres.indexOf(s) }
       val genreFromRank = udf { (r: Int) => usingGenres(r) }
 
       val trimmedData = moviesGenre
-        .join(spark.createDataset(usingGenres.toSeq).toDF("genre"), "genre")
-        .withColumn("genreRank", genreRank($"genre"))
+        .join(spark.createDataset(usingGenres.zipWithIndex.toSeq).toDF("genre", "genreRank"), "genre")
         .groupBy("id")
         .max("genreRank") // To break ties using most common genre, change .max() to .min()
         .withColumnRenamed("max(genreRank)", "genreRank")
         .withColumn("genre", genreFromRank($"genreRank"))
-        .join(joinedData, Seq("id", "genre"))
+        .join(yearData, Seq("id", "genre"))
 
       trimmedData.show
 
@@ -129,7 +138,7 @@ object Main {
         .fit(trimmedData)
 
       val va = new VectorAssembler()
-        .setInputCols(Array("avg_h", "avg_s", "avg_v", "year", "budget"))
+        .setInputCols(Array("avg_h", "avg_s", "avg_v"))
         .setOutputCol("features")
 
       val rf = new RandomForestClassifier()
@@ -176,7 +185,35 @@ object Main {
       // println(s"Learned classification forest model:\n ${rfModel.toDebugString}")
     }
 
-    println(genrePrediction)
+    lazy val reccomendation = {
+      val Array(training, test) = movieRatings.randomSplit(Array(0.75, 0.25))
+
+      val als = new ALS()
+        .setMaxIter(5)
+        .setRegParam(0.1)
+        .setUserCol("userId")
+        .setItemCol("movieId")
+        .setRatingCol("rating")
+
+      val model = als.fit(training)
+
+      model.setColdStartStrategy("drop")
+      val predictions = model.transform(test)
+
+      val evaluator = new RegressionEvaluator()
+        .setMetricName("rmse")
+        .setLabelCol("rating")
+        .setPredictionCol("prediction")
+
+      val rmse = evaluator.evaluate(predictions)
+      println(s"rmse: $rmse")
+
+      val users = movieRatings.select("userId").distinct().limit(3)
+      val userSubsetRecs = model.recommendForUserSubset(users, 10)
+      userSubsetRecs.show
+    }
+
+    println(reccomendation)
 
     spark.stop()
   }
